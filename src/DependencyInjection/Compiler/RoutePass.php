@@ -112,18 +112,22 @@ class RoutePass implements CompilerPassInterface
         $methodsWithMessageParameter = \array_filter(
             $handlerReflection->getMethods(ReflectionMethod::IS_PUBLIC),
             function (ReflectionMethod $method) {
-                return ($method->getNumberOfRequiredParameters() === 1 || $method->getNumberOfRequiredParameters() === 2)
-                    && $method->getParameters()[0]->getClass()
-                    && ($method->getParameters()[0]->getClass()->implementsInterface(HasMessageName::class)
+                $class = ($method->getNumberOfRequiredParameters() === 1 || $method->getNumberOfRequiredParameters() === 2)
+                    && !$method->getParameters()[0]->getType()->isBuiltin()
+                    && class_exists($method->getParameters()[0]->getType()->getName())
+                    ? new ReflectionClass($method->getParameters()[0]->getType()->getName()) : null;
+                
+                return $class
+                    && ($class->implementsInterface(HasMessageName::class)
                         || $method->getName() === '__invoke')
-                    && ! ($method->getParameters()[0]->getClass()->isInterface()
-                        || $method->getParameters()[0]->getClass()->isAbstract()
-                        || $method->getParameters()[0]->getClass()->isTrait());
+                    && ! ($class->isInterface()
+                        || $class->isAbstract()
+                        || $class->isTrait());
             }
         );
 
         return \array_unique(\array_map(function (ReflectionMethod $method) {
-            return self::detectMessageName($method->getParameters()[0]->getClass());
+            return self::detectMessageName(new ReflectionClass($method->getParameters()[0]->getType()->getName()));
         }, $methodsWithMessageParameter));
     }
 }
